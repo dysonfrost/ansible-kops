@@ -1,0 +1,55 @@
+---
+- name: Create an empty public bucket {{ wordpress_bucket_name }}
+  aws_s3:
+    bucket: "{{ wordpress_bucket_name }}"
+    mode: create
+    permission:
+      - public-read
+      - private
+    profile: "{{ aws_profile }}"
+  run_once: True
+
+- name: Generate Wordpress s3 policy document
+  template:
+    src: "{{ wordpress_policy }}.j2"
+    dest: "{{ playbook_dir }}/policies/{{ wordpress_policy }}"
+
+- name: Create IAM role for Wordpress amazon-s3 plugin
+  iam_role:
+    name: "{{ wordpress_role_name }}"
+    assume_role_policy_document: "{{ lookup('file','{{ trust_policy }}') }}"
+    profile: "{{ aws_profile }}"
+
+- name: Attach Wordpress S3 policy to the above role
+  iam_policy:
+    iam_type: role
+    iam_name: "{{ wordpress_role_name }}"
+    policy_name: "{{ wordpress_role_name }}"
+    state: present
+    policy_document: "{{ playbook_dir }}/policies/{{ wordpress_policy }}"
+    profile: "{{ aws_profile }}"
+
+- name: Make sure namespace wordpress doesn't exist
+  command: "kubectl get namespace wordpress"
+  register: _get_namespace
+  ignore_errors: true
+  no_log: true
+
+- name: Setting namespace if exists
+  set_fact:
+    get_namespace: "{{ _get_namespace['stdout'] }}"
+  when: _get_namespace.rc == 0
+
+- name: Create namespace wordpress
+  command: "kubectl create namespace wordpress"
+  when: get_namespace is not defined
+
+- name: Deploy wordpress using kubectl
+  command: "kubectl apply -f -"
+  args:
+    stdin: "{{ item }}"
+  with_items:
+    - "{{ lookup('template', 'mysql-deployment.yaml.j2') }}"
+    - "{{ lookup('template', 'wordpress-deployment.yaml.j2') }}"
+    - "{{ lookup('template', 'wordpress-ingress.yaml.j2') }}"
+    - "{{ lookup('template', 'wordpress-maintenance.yml.j2') }}"

@@ -1,0 +1,4 @@
+wordpress_role_name: k8s-wordpress-s3
+wordpress_policy: wordpress-s3-policy.json
+trust_policy: "{{ playbook_dir }}/policies/node-trust-policy.json"
+

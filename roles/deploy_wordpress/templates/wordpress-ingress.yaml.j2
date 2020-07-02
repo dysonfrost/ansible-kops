@@ -1,0 +1,23 @@
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: wordpress-ingress
+  namespace: wordpress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    kubernetes.io/tls-acme: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+spec:
+  tls:
+  - hosts:
+    - "*.{{ cluster_name }}"
+    secretName: wordpress-tls-cert-staging
+  rules:
+  - host: {{ wordpress_host }}.{{ cluster_name }}
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: {{ wordpress_service | default('varnish-svc') }}
+          servicePort: 80

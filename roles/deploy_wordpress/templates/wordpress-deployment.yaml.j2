@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: wordpress
+  name: wordpress-site
+  labels:
+    app: wordpress
+spec:
+  ports:
+    - port: 80
+  selector:
+    app: wordpress
+    tier: frontend
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: wordpress
+  name: wp-pv-claim
+  labels:
+    app: wordpress
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: wordpress
+  name: wordpress
+  labels:
+    app: wordpress
+spec:
+  selector:
+    matchLabels:
+      app: wordpress
+      tier: frontend
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: wordpress
+        tier: frontend
+    spec:
+      containers:
+      - image: jreisser/wordpress
+        name: wordpress
+        env:
+        - name: DB_HOST
+          value: {{ db_host }}
+        - name: DB_PASSWORD
+          value: {{ db_password }}
+        - name: DB_NAME
+          value: {{ db_name }}
+        - name: DB_USER
+          value: {{ db_user }}
+        - name: WORDPRESS_SITE_USER
+          value: {{ wp_user }}
+        - name: WORDPRESS_SITE_PASSWORD
+          value: {{ wp_password }}
+        - name: WORDPRESS_SITE_EMAIL
+          value: {{ wp_email }}
+        - name: WORDPRESS_SITE_URL
+          value: https://{{ wordpress_host }}.{{ cluster_name }}
+        ports:
+        - containerPort: 80
+          name: wordpress
+        volumeMounts:
+        - name: wordpress-persistent-storage
+          mountPath: /var/www/wp-content
+      volumes:
+      - name: wordpress-persistent-storage
+        persistentVolumeClaim:
+          claimName: wp-pv-claim
