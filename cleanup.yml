@@ -1,0 +1,9 @@
+---
+- name: Delete Kubernetes cluster using kops
+  hosts: localhost
+  tags: dev
+  vars_files:
+    - group_vars/all.yml
+
+  roles:
+  - delete_k8s_cluster

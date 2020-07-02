@@ -1,0 +1,37 @@
+---
+
+- name: Prepare Kubernetes cluster environment
+  hosts: localhost
+  tags: prepare
+  vars_files:
+    - group_vars/all.yml
+
+  roles:
+  - install_kubectl
+  - install_kops
+  - create_s3_bucket
+
+- name: Create Kubernetes cluster using kops
+  hosts: localhost
+  tags: build
+  vars_files:
+    - group_vars/all.yml
+
+  roles:
+  - create_k8s_cluster
+
+- name: Deploy Kubernetes operators and apps using kubectl and helm
+  hosts: localhost
+  tags: deploy
+  vars_files:
+    - group_vars/all.yml
+    - group_vars/secrets.yml
+
+  roles:
+  - deploy_helm
+  - deploy_kube2iam
+  - deploy_externaldns
+  - deploy_ingressnginx
+  - deploy_certmanager
+  - deploy_varnish
+  - deploy_wordpress
