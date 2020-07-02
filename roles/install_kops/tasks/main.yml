@@ -1,0 +1,41 @@
+---
+
+# ----- Install Kops ------
+- name: Capturing Kops Command
+  command: which kops
+  register: _kops_command
+  changed_when: false
+  ignore_errors: true
+  no_log: true
+
+- name: Setting Kops Command Path
+  set_fact:
+    kops_command: "{{ _kops_command['stdout'] }}"
+  when: _kops_command.rc != 1
+
+- name: Get Kops version
+  command: "{{ kops_command }} version"
+  register: _kops_version
+  when: kops_command is defined
+
+- name: Download Kops binaries (macOS)
+  get_url:
+    url: "{{ kops_darwin_download_path }}"
+    dest: "{{ kops_command | default('/usr/local/bin/kops') }}"
+    mode: a+x
+    force: yes
+  when:
+    - ansible_os_family == 'Darwin'
+    - "kops_command is not defined or kops_version not in _kops_version.stdout"
+  become: true
+
+- name: Download Kops binaries (linux)
+  get_url:
+    url: "{{ kops_download_path }}"
+    dest:  "{{ kops_command | default('/usr/local/bin/kops') }}"
+    mode: a+x
+    force: yes
+  when:
+    - ansible_os_family != 'Darwin'
+    - "kops_command is not defined or kops_version not in _kops_version.stdout"
+  become: yes
