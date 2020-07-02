@@ -1,0 +1,40 @@
+- name: Configure the cluster (ignore if already exists)
+  shell: |
+    kops create cluster \
+    --name {{ cluster_name }} \
+    --state s3://{{ bucket_name }} \
+    --cloud aws \
+    --zones {{ aws_zones }} \
+    --master-zones {{ master_zones | default(aws_zones) }} \
+    --master-size {{ master_instance_type }} \
+    --master-count {{ master_node_count }} \
+    --node-size {{ worker_instance_type }} \
+    --node-count {{ worker_node_count }} \
+    --ssh-public-key {{ ssh_pub_key }} \
+    --networking calico
+
+  ignore_errors: True
+  register: kops_error
+  failed_when: "'already exists' not in kops_error.stderr and kops_error.rc != 0"
+
+- name: Configure the physical cluster
+  shell: |
+    kops update cluster \
+    --name {{ cluster_name }} \
+    --state s3://{{ bucket_name }} \
+    --yes
+
+- name: Sleep for 5 minutes until cluster creation is done
+  wait_for:
+    timeout: 300
+  delegate_to: localhost
+
+- name: Validate the cluster (retry for 15 minutes)
+  shell: |
+    kops validate cluster \
+    --name {{ cluster_name }} \
+    --state s3://{{ bucket_name }}
+  delay: 60
+  retries: 15
+  register: validation
+  until: validation is succeeded
