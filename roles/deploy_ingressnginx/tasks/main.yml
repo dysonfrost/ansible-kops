@@ -1,0 +1,6 @@
+- name: Deploy ingress NGINX
+  shell: |
+    helm install nginx-ingress stable/nginx-ingress \
+    --namespace kube-system \
+    --set controller.publishService.enabled=true
+  ignore_errors: true
