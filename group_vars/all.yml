@@ -1,0 +1,46 @@
+#####################
+# ~~ Domain name ~~ #
+cluster_name: dyson.detainedu.com
+
+##########################
+# ~~ Kops state store ~~ #
+bucket_name: staging-kops-bucket-jreisser
+
+###############################################
+# ~~ SSH public key to acces Kubernetes API ~~#
+ssh_pub_key: ~/.ssh/id_rsa.pub
+
+########################################
+# ~~ AWS environment for kubernetes ~~ #
+
+# Match with your AWS profile in case of multi-account environment
+aws_profile: default
+aws_region: eu-west-1
+
+# Be careful, master_zones must match maser_node_count
+# Example: can't have 1 master in 2 AWS availability zones
+master_zones: eu-west-1a
+aws_zones: eu-west-1a,eu-west-1b,eu-west-1c
+
+# Kubernetes master nodes
+master_instance_type: t3.medium
+master_node_count: 1
+
+# Kubernetes worker nodes
+worker_instance_type: t3.medium
+worker_node_count: 3
+
+############################################
+# ~~ Let's encrypt domain's email owner ~~ #
+email_owner: jeremy.reisser@gmail.com
+
+#########################
+# ~~ Wordpress block ~~ #
+
+# Use maintenance-svc to enable maintenance mode
+# Default to varnish service varnish-svc (uncomment to activate)
+# wordpress_service: maintenance-svc
+
+# (probably should move this block to ansible role deploy_wordpress)
+wordpress_host: wordpress
+wordpress_bucket_name: jreisser-wordpress-unique-bucket
