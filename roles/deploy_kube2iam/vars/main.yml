@@ -1,0 +1,2 @@
+kube2iam_policy: kube2iam-policy.json
+node_trust_policy: node-trust-policy.json

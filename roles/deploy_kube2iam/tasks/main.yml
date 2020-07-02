@@ -1,0 +1,48 @@
+- name: Find cluster nodes ARN instance profile
+  iam_role_info:
+    name: nodes.{{ cluster_name }}
+    profile: "{{ aws_profile }}"
+  register: _nodes_arn
+
+- name: Setting cluster nodes ARN
+  set_fact:
+    nodes_arn: "{{ _nodes_arn.iam_roles.0.arn }}"
+
+- name: Setting base role ARN
+  set_fact:
+    base_role_arn: "{{nodes_arn.split('/')[0]}}"
+
+- name: Install kube2iam using Helm
+  shell: |
+    helm install kube2iam stable/kube2iam \
+    --namespace kube-system \
+    --set=extraArgs.base-role-arn={{ base_role_arn }}/,extraArgs.default-role=kube2iam-default \
+    --set=host.iptables=true,host.interface=cali+ \
+    --set=rbac.create=true
+  ignore_errors: True
+  register: helm_error
+  failed_when: "'still in use' not in kops_error.stderr and kops_error.rc != 0"
+
+- name: Generate node trust policy document
+  template:
+    src: "{{ node_trust_policy }}.j2"
+    dest: "{{ playbook_dir }}/policies/{{ node_trust_policy }}"
+  register: _policy
+
+- name: Setting trust policy path
+  set_fact:
+    trust_policy: "{{ _policy.dest }}"
+
+- name: Generate Kube2IAM policy document
+  template:
+    src: "{{ kube2iam_policy }}.j2"
+    dest: "{{ playbook_dir }}/policies/{{ kube2iam_policy }}"
+
+- name: Let STS assume roles on worker nodes
+  iam_policy:
+    iam_type: role
+    iam_name: "nodes.{{ cluster_name }}"
+    policy_name: kube2iam
+    state: present
+    policy_document: "{{ playbook_dir }}/policies/{{ kube2iam_policy }}"
+    profile: "{{ aws_profile }}"
