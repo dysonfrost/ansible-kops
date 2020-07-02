@@ -1,0 +1,2 @@
+externaldns_role_name: k8s-external-dns
+externaldns_policy: route53-policy.json
