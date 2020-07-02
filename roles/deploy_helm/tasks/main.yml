@@ -1,0 +1,61 @@
+---
+
+# ----- Install Helm ------
+- name: Capturing helm Command
+  command: which helm
+  register: _helm_command
+  changed_when: false
+  ignore_errors: true
+  no_log: true
+
+- name: Setting Helm Command Path
+  set_fact:
+    helm_command: "{{ _helm_command['stdout'] }}"
+  when: _helm_command.rc != 1
+
+- name: Get Helm version
+  command: "{{ helm_command }} version --client"
+  register: _helm_version
+  when: helm_command is defined
+
+- name: Download Helm binaries (macOS)
+  unarchive:
+    src: "{{ helm_darwin_download_path }}"
+    dest: /usr/local/bin
+    mode: a+x
+    remote_src: yes
+    extra_opts:
+      - --strip=1
+      - --wildcards
+      - '*/helm'
+  when:
+    - ansible_os_family == 'Darwin'
+    - "helm_command is not defined or helm_version not in _helm_version.stdout"
+  become: yes
+
+- name: Download Helm binaries (linux)
+  unarchive:
+    src: "{{ helm_download_path }}"
+    dest: /usr/local/bin
+    mode: a+x
+    remote_src: yes
+    extra_opts:
+      - --strip=1
+      - --wildcards
+      - '*/helm'
+  when:
+    - ansible_os_family != 'Darwin'
+    - "helm_command is not defined or helm_version not in _helm_version.stdout"
+  become: yes
+
+- name: Initialize official Helm chart repository
+  shell: |
+    helm repo add stable {{ helm_official_repo }}
+
+- name: Activate ServiceAccount and RBAC
+  command: "kubectl apply -f -"
+  args:
+    stdin: "{{ item }}"
+  with_items:
+    - "{{ lookup('template', 'svcaccount.yaml.j2') }}"
+    - "{{ lookup('template', 'rbac.yaml.j2') }}"
