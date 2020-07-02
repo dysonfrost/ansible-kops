@@ -1,0 +1,128 @@
+---
+- name: Make sure namespace cert-manager doesn't exist
+  command: "kubectl get namespace cert-manager"
+  register: _get_namespace
+  ignore_errors: true
+  no_log: true
+
+- name: Setting namespace if exists
+  set_fact:
+    get_namespace: "{{ _get_namespace['stdout'] }}"
+  when: _get_namespace.rc == 0
+
+- name: Create namespace cert-manager
+  command: "kubectl create namespace cert-manager"
+  when: get_namespace is not defined
+
+- name: Make sure secret doesn't exist
+  command: "kubectl -n cert-manager get secret {{ certmanager_secret }}"
+  register: _get_secret
+  ignore_errors: true
+  no_log: true
+
+- name: Setting secret if exists
+  set_fact:
+    get_secret: "{{ _get_secret['stdout'] }}"
+  when: _get_secret.rc == 0
+
+- name: Delete existing secret {{ certmanager_secret }}
+  command: "kubectl -n cert-manager delete secret {{ certmanager_secret }}"
+  when: get_secret is defined
+
+- name: Make sure AWS user {{ certmanager_user_name }} doesn't already exists
+  shell: |
+    aws iam list-users --query 'Users[*].UserName'
+  register: _listUsers
+
+- name: Setting AWS user {{ certmanager_user_name }}
+  set_fact:
+    listUsers: "{{ _listUsers.stdout }}"
+  when: "'cert-manager' in _listUsers.stdout"
+
+- name: Retrieve {{ certmanager_user_name }} access_key_ids
+  shell: |
+    aws iam list-access-keys --user-name cert-manager --query 'AccessKeyMetadata[].AccessKeyId'
+  register: _existingKeys
+  when: listUsers is defined
+
+- name: Delete access_key_id of existing {{ certmanager_user_name }} user
+  iam:
+    iam_type: user
+    name: "{{ certmanager_user_name }}"
+    state: absent
+    access_key_ids: [ "{{ _existingKeys }}" ]
+    access_key_state: remove
+    profile: "{{ aws_profile }}"
+  connection: local
+  register: _credentials
+  when: listUsers is defined
+
+- name: Create restricted AWS {{ certmanager_user_name }} user to access route53
+  iam:
+    iam_type: user
+    name: "{{ certmanager_user_name }}"
+    state: present
+    access_key_state: create
+    profile: "{{ aws_profile }}"
+  connection: local
+  register: _credentials
+
+- name: Retrieve access_key_id
+  set_fact:
+    access_key_id: "{{ _credentials.user_meta.access_keys.0.access_key_id }}"
+
+- name: Retrieve secret_access_key
+  set_fact:
+    secret_access_key: "{{ _credentials.user_meta.access_keys.0.secret_access_key }}"
+
+- name: Attach cert-manager policy to the above user
+  iam_policy:
+    iam_type: user
+    iam_name: "{{ certmanager_user_name }}"
+    policy_name: "{{ certmanager_user_name }}"
+    state: present
+    policy_document: "{{ playbook_dir }}/policies/{{ certmanager_policy }}"
+    profile: "{{ aws_profile }}"
+
+- name: Create secret from secret_access_key
+  shell: |
+    kubectl -n cert-manager create secret generic {{ certmanager_secret }} \
+    --from-literal=secret-access-key={{ secret_access_key }}
+
+- name: Override secret_access_key to null
+  set_fact:
+    secret_access_key:
+
+- name: Pre-requisites to use cert-manager using Helm
+  shell: |
+    helm repo add jetstack https://charts.jetstack.io \
+    && helm repo update
+
+- name: Deploy cert-manager
+  shell: |
+    helm install \
+    cert-manager jetstack/cert-manager \
+    --namespace cert-manager \
+    --version v0.15.1 \
+    --set installCRDs=true
+  ignore_errors: true
+  no_log: true
+
+- name: sleep for 20 seconds
+  wait_for:
+    timeout: 20
+  delegate_to: localhost
+
+- name: Create ClusterIssuer for letsencrypt-staging
+  command: "kubectl apply -f -"
+  args:
+    stdin: "{{ item }}"
+  with_items:
+    - "{{ lookup('template', 'issuer-staging.yml.j2') }}"
+
+- name: Create ClusterIssuer for letsencrypt-prod
+  command: "kubectl apply -f -"
+  args:
+    stdin: "{{ item }}"
+  with_items:
+    - "{{ lookup('template', 'issuer-prod.yml.j2') }}"
