@@ -1,0 +1,6 @@
+pre-commit
+awscli
+ansible
+boto3
+jq
+certbot-dns-route53
