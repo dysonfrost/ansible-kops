@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  db:
+    container_name: wordpress-db
+    image: mariadb:10.3
+    volumes:
+      - "db-data:/var/lib/mysql"
+    networks:
+      - web
+    environment:
+      MYSQL_ROOT_PASSWORD: myrootpassword
+      MYSQL_DATABASE: db-wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: sqlpassword
+
+  wordpress:
+    depends_on:
+      - db
+    container_name: wordpress
+    image: jreisser/wordpress
+    volumes:
+      - "site-data:/var/www/wp-content"
+    ports:
+      - "80:80"
+    networks:
+      - web
+    environment:
+      DB_HOST: db
+      DB_PASSWORD: sqlpassword
+      DB_NAME: db-wordpress
+      DB_USER: wordpress
+      WORDPRESS_SITE_USER: dysonfrost
+      WORDPRESS_SITE_PASSWORD: admin
+      WORDPRESS_SITE_EMAIL: myemail@email.com
+
+
+      FS_METHOD: direct
+      # For debugging only:
+      #WP_DEBUG: "true"
+      #WP_DEBUG_DISPLAY: "true"
+
+volumes:
+  db-data:
+  site-data:
+
+networks:
+  web:
+    external: true
