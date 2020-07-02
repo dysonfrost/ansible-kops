@@ -1,0 +1,11 @@
+---
+
+# ----- Create S3 Bucket ------
+
+- name: Create an empty bucket {{ bucket_name }}
+  aws_s3:
+    bucket: "{{ bucket_name }}"
+    mode: create
+    permission: private
+    profile: "{{ aws_profile }}"
+  run_once: True
