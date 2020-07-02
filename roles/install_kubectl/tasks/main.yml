@@ -1,0 +1,45 @@
+---
+
+# ----- Install Kubectl ------
+- name: Capturing Kubectl Command
+  command: which kubectl
+  register: _kubectl_command
+  changed_when: false
+  ignore_errors: true
+  no_log: true
+
+- name: Setting Kubectl Command Path
+  set_fact:
+    kubectl_command: "{{ _kubectl_command['stdout'] }}"
+  when: _kubectl_command.rc != 1
+
+- name: Get Kubectl version
+  command: "{{ kubectl_command }} version --client"
+  register: _kubectl_version
+  when: kubectl_command is defined
+
+- name: Download Kubectl binaries
+  get_url:
+    url: "{{ kubectl_darwin_download_path }}/{{ item }}"
+    dest: "{{ kubectl_command | default('/usr/local/bin/kubectl') }}"
+    mode: a+x
+    force: yes
+  with_items:
+    - kubectl
+  when:
+    - ansible_os_family == 'Darwin'
+    - "kubectl_command is not defined or kubectl_version not in _kubectl_version.stdout"
+  become: true
+
+- name: Download Kubectl binaries
+  get_url:
+    url: "{{ kubectl_download_path }}/{{ item }}"
+    dest: "{{ kubectl_command | default('/usr/local/bin/kubectl') }}"
+    mode: a+x
+    force: yes
+  with_items:
+    - kubectl
+  when:
+    - ansible_os_family != 'Darwin'
+    - "kubectl_command is not defined or kubectl_version not in _kubectl_version.stdout"
+  become: true
