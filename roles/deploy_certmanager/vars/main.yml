@@ -1,0 +1,3 @@
+certmanager_user_name: cert-manager
+certmanager_policy: cert-manager-policy.json
+certmanager_secret: cert-manager-route53
