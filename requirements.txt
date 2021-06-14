@@ -4,3 +4,4 @@ ansible
 boto3
 jq
 certbot-dns-route53
+rsa>=4.7 # not directly required, pinned by Snyk to avoid a vulnerability
